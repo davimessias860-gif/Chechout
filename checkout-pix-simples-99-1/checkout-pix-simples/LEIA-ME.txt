@@ -1,25 +1,43 @@
-GERADOR PIX SIMPLES - PAGAR.ME / NETLIFY
+JVC PAY — INTEGRAÇÃO PIX PAGAR.ME V5
 
-Campos visíveis: nome visual da instituição, valor, nome completo, e-mail, CPF, telefone.
-Após gerar: QR Code ao lado do Pix Copia e Cola. Split previsto 99% / 1%.
+REGRAS OBRIGATÓRIAS NO SERVIDOR
+Cada pedido usa POST https://api.pagar.me/core/v5/orders com payments[0].payment_method = pix e duas regras em payments[0].split:
+99%, type percentage: Thiago Farias, re_cmv8j7x5vtbmy0l9tgfjq8uzn.
+1%, type percentage: João Victor, re_cmv88m9b67jxf0l9tqzl5w9pp, lido de PAGARME_RECIPIENT_1.
+O servidor exige exatamente o ID de João Victor informado. Nenhum valor vindo do navegador altera a divisão. Não há fallback sem split, conversão inventada de IDs ou recebedores de exemplo.
 
-1. Para publicar no Netlify, descompacte o ZIP e envie a PASTA do projeto, ou conecte um repositório Git.
-   IMPORTANTE: as Netlify Functions precisam ser implantadas também. Não basta publicar somente index.html.
-2. Em Site configuration > Environment variables, defina:
-   PAGARME_SECRET_KEY = sua chave privada (NUNCA coloque no código HTML)
-   PAGARME_RECIPIENT_99 = ID V5 do recebedor de 99%
-   PAGARME_RECIPIENT_1 = ID V5 do recebedor de 1%
-3. Faça novo deploy após configurar as variáveis.
+CONFIGURAÇÃO NA NETLIFY
+PAGARME_SECRET_KEY: chave secreta válida da conta de produção Pagar.me. Use somente o escopo Functions e contexto Production, sem publicá-la no código, frontend ou mensagens.
+PAGARME_RECIPIENT_1: re_cmv88m9b67jxf0l9tqzl5w9pp. Esse valor foi definido em context.production.environment no netlify.toml da raiz, para aplicação no deploy. A gravação pela CLI não foi confirmada na leitura posterior.
+PAGARME_PRINCIPAL_CONFIRMED: false até que o administrador confirme que João Victor é realmente o recebedor principal da mesma conta de produção. A variável foi definida como false no netlify.toml. Somente após essa confirmação, altere-a para true nesse arquivo e publique novamente para liberar tentativas de criação. A configuração no arquivo prevalece sobre o painel; não basta alterar apenas o painel. Isso não declara os recebíveis validados.
+PAGARME_RECIPIENT_99 não é utilizada: o destinatário de 99% é fixo no servidor.
+Após corrigir/configurar as variáveis, publique novamente. O netlify.toml da raiz já indica as pastas da página e das funções. Use HTTPS. Não disponibilize a chave de produção em deploys de teste.
 
-ATENÇÃO - LIMITAÇÕES REAIS:
-A API V5 documenta IDs com prefixo rp_. Os seus IDs informados eram:
-99%: re_cmv8j7x5vtbmy0l9tgfjq8uzn
- 1%: re_cmv88m9b67jxf0l9tqzl5w9pp
-Esses IDs re_ NÃO foram convertidos automaticamente. O servidor bloqueia cobranças enquanto não configurar os IDs V5 válidos. Confirme a correspondência com a Pagar.me.
+RESULTADO DA VERIFICAÇÃO REAL NESTA REVISÃO
+As consultas autenticadas GET /core/v5/recipients/{recipient_id}, realizadas com a credencial acessível em Production/Functions, retornaram HTTP 401 para ambos os IDs. Nenhum pedido de produção foi criado. A autenticação precisa ser corrigida; não foi possível confirmar pela API se os IDs são aceitos, estão ativos ou pertencem à mesma conta. O status Ativo informado pelo administrador não substitui essa verificação.
 
-A documentação de criação de pedidos diz que clientes PSP devem incluir endereço completo do comprador. Este layout de seis campos não o coleta e uma cobrança pode ser rejeitada. Se a Pagar.me exigir endereço na sua conta, será necessário coletar dados verdadeiros ou usar um customer_id previamente cadastrado corretamente; nunca preencher endereço fictício.
+A documentação V5 descreve recipient_id com prefixo rp_. O checkout preserva os IDs re_ fornecidos e verifica os dois por GET /recipients/{recipient_id}, com a mesma chave usada para criar o pedido. É necessário obter resposta autenticada com o ID exato e status active para cada um antes de criar a cobrança. Se os IDs forem recusados após corrigir a autenticação, solicite à Pagar.me os IDs V5 correspondentes; não troque apenas o prefixo. O cadastro ativo não prova que João Victor é o principal: confirme essa informação no painel da conta ou com o suporte Pagar.me.
 
-Nome visual: aparece somente como referência na página. O QR Code e o Copia e Cola são os dados ORIGINAIS devolvidos pela Pagar.me. Não alteramos o nome no código Pix; a identificação oficial não é personalizável pelo checkout.
+PROTEÇÕES E COMPORTAMENTO
+Sem chave, ID correto de João Victor ou confirmação do principal, o backend bloqueia a criação. Quando liberado, consulta ambos os recebedores; rejeição, ID divergente, inatividade ou falha de consulta impedem o POST do pedido. A API de criação precisa aceitar Pix com split na modalidade contratada. Contas PSP podem exigir endereço do comprador; o formulário de seis campos não inventa dados para contornar exigências.
 
-Este projeto NÃO foi testado com credenciais de produção. Conferir taxa, divisão e recebimento antes de usar comercialmente.
-Documentação: https://docs.pagar.me/reference/criar-pedido-2 ; https://docs.pagar.me/reference/pix-2 ; https://docs.pagar.me/reference/split-1
+Pix Copia e Cola e QR Code usam exclusivamente o conteúdo devolvido pela Pagar.me. O QR Code é renderizado localmente, sem serviços externos de imagem. Os dados pessoais são usados no servidor para a cobrança. A consulta automática de status ocorre a cada 12 segundos com a página visível, por até 30 minutos, e também está disponível por botão. Ela usa a API real e cookie de sessão HttpOnly, Secure e SameSite. A sessão corresponde à última cobrança gerada no navegador. Não há geração simulada em produção.
+
+O valor de expiração solicitado é 30 minutos. Repetições com os mesmos dados e a mesma página reutilizam a chave de idempotência. Não recarregue a página para repetir uma cobrança de resultado incerto; confira antes o painel da operadora.
+
+TESTE REAL DE R$ 10,00 — VALIDAÇÃO AINDA PENDENTE
+1. Corrija a chave de produção e comprove a compatibilidade dos dois recebedores nos endpoints V5. Confirme João Victor como principal antes de definir PAGARME_PRINCIPAL_CONFIRMED=true.
+2. Confirme habilitação de Pix com split na Pagar.me e requisitos cadastrais. Publique e abra o checkout HTTPS.
+3. Gere uma cobrança de R$ 10,00 com dados verdadeiros. Confira o favorecido no aplicativo bancário antes de pagar. Pague uma vez e aguarde o status de confirmação no checkout.
+4. No painel Pagar.me, localize o pedido e a cobrança pelo horário, valor e ID. Confira as duas regras de split e os recebíveis vinculados a cada recebedor: R$ 9,90 brutos para Thiago Farias e R$ 0,10 bruto para João Victor.
+5. As taxas de processamento e ajustes de arredondamento estão atribuídos ao recebedor de 99%; os valores líquidos podem diferir. Confira os recebíveis e posteriormente sua liquidação. O status pago da cobrança não comprova sozinho o split.
+6. Só considere a integração validada após conferir os recebíveis de ambos na Pagar.me. Nenhum desses recebíveis foi conferido durante esta revisão.
+
+TESTES AUTOMATIZADOS
+Na raiz: node --test tests/pix.test.mjs
+As respostas controladas dos testes verificam o payload, os dois IDs exatos, percentuais, idempotência, autorização de consulta e bloqueios de criação. Elas não substituem a venda real nem a conferência dos recebíveis.
+
+DOCUMENTAÇÃO OFICIAL
+https://docs.pagar.me/reference/criar-pedido-2
+https://docs.pagar.me/reference/split-1
+https://docs.pagar.me/reference/obter-recebedor-1
