@@ -1,0 +1,25 @@
+GERADOR PIX SIMPLES - PAGAR.ME / NETLIFY
+
+Campos visíveis: nome visual da instituição, valor, nome completo, e-mail, CPF, telefone.
+Após gerar: QR Code ao lado do Pix Copia e Cola. Split previsto 99% / 1%.
+
+1. Para publicar no Netlify, descompacte o ZIP e envie a PASTA do projeto, ou conecte um repositório Git.
+   IMPORTANTE: as Netlify Functions precisam ser implantadas também. Não basta publicar somente index.html.
+2. Em Site configuration > Environment variables, defina:
+   PAGARME_SECRET_KEY = sua chave privada (NUNCA coloque no código HTML)
+   PAGARME_RECIPIENT_99 = ID V5 do recebedor de 99%
+   PAGARME_RECIPIENT_1 = ID V5 do recebedor de 1%
+3. Faça novo deploy após configurar as variáveis.
+
+ATENÇÃO - LIMITAÇÕES REAIS:
+A API V5 documenta IDs com prefixo rp_. Os seus IDs informados eram:
+99%: re_cmv8j7x5vtbmy0l9tgfjq8uzn
+ 1%: re_cmv88m9b67jxf0l9tqzl5w9pp
+Esses IDs re_ NÃO foram convertidos automaticamente. O servidor bloqueia cobranças enquanto não configurar os IDs V5 válidos. Confirme a correspondência com a Pagar.me.
+
+A documentação de criação de pedidos diz que clientes PSP devem incluir endereço completo do comprador. Este layout de seis campos não o coleta e uma cobrança pode ser rejeitada. Se a Pagar.me exigir endereço na sua conta, será necessário coletar dados verdadeiros ou usar um customer_id previamente cadastrado corretamente; nunca preencher endereço fictício.
+
+Nome visual: aparece somente como referência na página. O QR Code e o Copia e Cola são os dados ORIGINAIS devolvidos pela Pagar.me. Não alteramos o nome no código Pix; a identificação oficial não é personalizável pelo checkout.
+
+Este projeto NÃO foi testado com credenciais de produção. Conferir taxa, divisão e recebimento antes de usar comercialmente.
+Documentação: https://docs.pagar.me/reference/criar-pedido-2 ; https://docs.pagar.me/reference/pix-2 ; https://docs.pagar.me/reference/split-1
